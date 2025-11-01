@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" type="image/png" href="icons/icon-192.png">
+    <title>PWA Repeat Timer</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1f2937">
+    <style>
+        :root {
+            font-family: Inter, system-ui, Segoe UI, Roboto, 'Helvetica Neue', Arial;
+            margin: 0
+        }
+
+        body {
+            display: flex;
+            min-height: 100vh;
+            align-items: center;
+            justify-content: center;
+            background: #0f172a;
+            color: #e6eef8
+        }
+
+        .card {
+            width: 420px;
+            padding: 20px;
+            border-radius: 12px;
+            background: linear-gradient(180deg, #0b1220, #0f172a);
+            box-shadow: 0 6px 30px rgba(2, 6, 23, .6);
+            text-align: center
+        }
+
+        h1 {
+            font-size: 22px;
+            margin-bottom: 12px
+        }
+
+        input {
+            font-size: 20px;
+            text-align: center;
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #233240;
+            background: #071020;
+            color: #e6eef8;
+            letter-spacing: 2px
+        }
+
+        .controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px
+        }
+
+        button {
+            flex: 1;
+            padding: 10px;
+            border-radius: 8px;
+            border: 0;
+            background: #2563eb;
+            color: white;
+            cursor: pointer;
+            font-size: 15px
+        }
+
+        button.secondary {
+            background: #334155
+        }
+
+        #countdown {
+            font-size: 40px;
+            margin-top: 20px;
+            font-weight: bold;
+            letter-spacing: 2px
+        }
+
+        .footer {
+            margin-top: 12px;
+            text-align: center;
+            color: #94a3b8;
+            font-size: 13px
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>PWA Repeat Timer</h1>
+        <label for="timeInput">Set Timer (HH:MM:SS)</label>
+        <input id="timeInput" type="text" value="00:10:00" pattern="\\d{2}:\\d{2}:\\d{2}" />
+
+        <div class="controls">
+            <button id="startBtn">Start</button>
+            <button id="stopBtn" class="secondary">Stop</button>
+        </div>
+
+        <div id="countdown">00:00:00</div>
+
+        <!-- <div class="controls" style="margin-top:10px">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="number" id="snoozeTime" step="1" placeholder="Snooze Time" value="5" />
+                <button id="snoozeBtn" class="secondary">Snooze min</button>
+            </div>
+
+
+            <button id="resetBtn" class="secondary">Reset</button>
+        </div> -->
+
+        <div class="footer">Install as PWA for reliable background timing.</div>
+    </div>
+
+    <audio id="ring" preload="auto" src="ringtone.wav"></audio>
+
+    <script>
+        const startBtn = document.getElementById('startBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const snoozeBtn = document.getElementById('snoozeBtn');
+        const snoozeTime = document.getElementById('snoozeTime');
+        const resetBtn = document.getElementById('resetBtn');
+        const timeInput = document.getElementById('timeInput');
+        const countdownEl = document.getElementById('countdown');
+        const ring = document.getElementById('ring');
+
+        let timerId = null, tickInterval = null, endTs = 0, running = false;
+
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js');
+
+        function parseTime(t) {
+            const [h, m, s] = t.split(':').map(Number);
+            return ((h || 0) * 3600 + (m || 0) * 60 + (s || 0)) * 1000;
+        }
+
+        function formatTime(ms) {
+            let s = Math.max(0, Math.floor(ms / 1000));
+            const h = Math.floor(s / 3600); s %= 3600;
+            const m = Math.floor(s / 60); const sec = s % 60;
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+        }
+
+        function updateUI() {
+            if (running) {
+                const now = Date.now();
+                const remain = Math.max(0, endTs - now);
+                countdownEl.textContent = formatTime(remain);
+            }
+        }
+
+        function startTimer(duration) {
+            clearTimeout(timerId); clearInterval(tickInterval);
+            endTs = Date.now() + duration; running = true;
+            timerId = setTimeout(onTimerComplete, duration);
+            tickInterval = setInterval(updateUI, 1000);
+            updateUI();
+        }
+
+        async function onTimerComplete() {
+            ring.currentTime = 0;
+            try { await ring.play(); } catch (e) { console.warn(e) }
+            if (Notification.permission === 'granted') {
+                new Notification('Timer Done', { body: 'Timer finished and restarted.' });
+            }
+            startTimer(parseTime(timeInput.value));
+        }
+
+        startBtn.onclick = async () => {
+            if (Notification.permission !== 'granted') await Notification.requestPermission();
+            startTimer(parseTime(timeInput.value));
+        };
+
+        stopBtn.onclick = () => { clearTimeout(timerId); clearInterval(tickInterval); running = false; countdownEl.textContent = '00:00:00'; };
+
+        // snoozeBtn.onclick = () => { clearTimeout(timerId); clearInterval(tickInterval); timerId = setTimeout(onTimerComplete, snoozeTime.value * 60 * 1000); tickInterval = setInterval(updateUI, 1000); updateUI(); };
+
+        // resetBtn.onclick = () => { startTimer(parseTime(timeInput.value)); };
+
+        setInterval(() => { if (running) updateUI(); }, 1000);
+    </script>
+</body>
+
+</html>
