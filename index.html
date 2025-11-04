@@ -159,9 +159,17 @@
         async function onTimerComplete() {
             ring.currentTime = 0;
             try { await ring.play(); } catch (e) { console.warn(e) }
+
             if (Notification.permission === 'granted') {
-                new Notification('Timer Done', { body: 'Timer finished and restarted.' });
+                if (navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage({
+                        type: 'show-notification',
+                        title: 'Timer Done',
+                        body: 'Timer finished and restarted.'
+                    });
+                }
             }
+
             startTimer(parseTime(timeInput.value));
         }
 
